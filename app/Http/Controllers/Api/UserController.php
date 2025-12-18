@@ -7,6 +7,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use App\Models\User;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\UserCreatedMail;
 
 class UserController extends Controller
 {
@@ -16,8 +18,8 @@ class UserController extends Controller
     public function index()
     {
         $list = User::with('category:id,name')
-        ->select('id', 'name', 'email', 'role', 'status', 'category_id')
-        ->get();
+            ->select('id', 'name', 'email', 'role', 'status', 'category_id')
+            ->get();
 
         return response()->json([
             'status' => true,
@@ -65,29 +67,35 @@ class UserController extends Controller
             $status = $request->status;
         }
 
+        $plainPassword = $request->password;
+
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make('password'),
             'role'     => $request->role,
             'phone'   => $request->phone,
-            'category_id' =>$request->category_id,
+            'category_id' => $request->category_id,
             'status'  => $status
         ]);
 
+        Mail::to($user->email)->send(
+            new UserCreatedMail($user->email, $plainPassword)
+        );
+
         return response()->json([
-        'status' => true,
-        'message' => 'User created successfully',
-        'data' => [
-            'user_id'     => $user->id,
-            // 'name'        => $user->name,
-            // 'email'       => $user->email,
-            // 'phone'       => $user->phone,
-            // 'role'        => $user->role,
-            // 'status'      => $user->status,
-            'category_id' => $user->category_id,
-            'category_name' => $user->category?->name
-        ]
+            'status' => true,
+            'message' => 'User created successfully',
+            'data' => [
+                'user_id'     => $user->id,
+                // 'name'        => $user->name,
+                // 'email'       => $user->email,
+                // 'phone'       => $user->phone,
+                // 'role'        => $user->role,
+                // 'status'      => $user->status,
+                'category_id' => $user->category_id,
+                'category_name' => $user->category?->name
+            ]
         ]);
     }
 

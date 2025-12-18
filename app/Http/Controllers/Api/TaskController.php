@@ -1,6 +1,7 @@
 <?php
 
 namespace App\Http\Controllers\Api;
+
 use App\Services\FirebaseNotificationService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -8,12 +9,15 @@ use App\Models\Tasks;
 use App\Models\TaskComments;
 use App\Models\Notifications;
 use App\Models\Projects;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\TaskCreateMail;
+use App\Models\User;
 
 class TaskController extends Controller
 {
-   
+
     // CREATE TASK
-   
+
     public function create(Request $request)
     {
         $data = $request->validate([
@@ -39,6 +43,14 @@ class TaskController extends Controller
         }
 
         $task = Tasks::create($data);
+
+        $project_title = Projects::find($request->project_id)->title;
+        $email = User::find($request->assigned_to)->email;
+
+        Mail::to($email)->send(
+            new TaskCreateMail($project_title, $request->title)
+        );
+
         // $firebase = new FirebaseNotificationService();
         // $firebase->sendToUser(
         //     $data['assigned_to'],
@@ -55,7 +67,7 @@ class TaskController extends Controller
     }
 
     //  UPDATE STATUS
-   
+
     public function updateStatus(Request $request)
     {
         $validated = $request->validate([
@@ -112,7 +124,7 @@ class TaskController extends Controller
     }
 
     //  ADD COMMENT
-     public function addComment(Request $request)
+    public function addComment(Request $request)
     {
         $validated = $request->validate([
             'task_id' => 'required|exists:tasks,id',
@@ -148,16 +160,16 @@ class TaskController extends Controller
 
 
 
-     public function taskList()
+    public function taskList()
     {
-            $tasks = Tasks::with([
+        $tasks = Tasks::with([
             'project:id,title',
             'assignedUser:id,name',
             'comments:id,task_id,user_id,comment,created_at',
             'comments.user:id,name',
             'worklogs.user:id,name'
         ])
-        ->orderByRaw("
+            ->orderByRaw("
             CASE status
                 WHEN 'todo' THEN 1
                 WHEN 'pending' THEN 2
@@ -166,8 +178,8 @@ class TaskController extends Controller
                 ELSE 5
             END
         ")
-        ->orderBy('end_date', 'asc')
-        ->get();
+            ->orderBy('end_date', 'asc')
+            ->get();
 
         $response = $tasks->map(function ($task) {
             return [
@@ -199,7 +211,7 @@ class TaskController extends Controller
                         'user_id'   => $log->user_id,
                         'user_name' => $log->user?->name,
                         'hours'     => $log->hours,
-                       'createdAt' => $log->created_at
+                        'createdAt' => $log->created_at
                             ? $log->created_at->format('Y-m-d H:i')
                             : null
                     ];
@@ -268,22 +280,22 @@ class TaskController extends Controller
 
     public function tasksByUserAndProject(Request $request)
     {
-        
+
         $validated = $request->validate([
             'user_id'    => 'required|exists:users,id',
             'project_id' => 'required|exists:projects,id'
         ]);
 
         $tasks = Tasks::with([
-        'project:id,title',
-        'assignedUser:id,name',
-        'comments:id,task_id,user_id,comment,created_at',
-        'comments.user:id,name',
-        'worklogs.user:id,name'
+            'project:id,title',
+            'assignedUser:id,name',
+            'comments:id,task_id,user_id,comment,created_at',
+            'comments.user:id,name',
+            'worklogs.user:id,name'
         ])
-        ->where('assigned_to', $validated['user_id'])
-        ->where('project_id', $validated['project_id'])
-        ->orderByRaw("
+            ->where('assigned_to', $validated['user_id'])
+            ->where('project_id', $validated['project_id'])
+            ->orderByRaw("
             CASE status
                 WHEN 'todo' THEN 1
                 WHEN 'pending' THEN 2
@@ -292,8 +304,8 @@ class TaskController extends Controller
                 ELSE 5
             END
         ")
-        ->orderBy('end_date', 'asc')
-        ->get();
+            ->orderBy('end_date', 'asc')
+            ->get();
 
         $response = $tasks->map(function ($task) {
             return [
@@ -341,8 +353,8 @@ class TaskController extends Controller
             'comments.user:id,name',
             'worklogs.user:id,name'
         ])
-        ->where('project_id', $projectId)
-        ->orderByRaw("
+            ->where('project_id', $projectId)
+            ->orderByRaw("
             CASE status
                 WHEN 'todo' THEN 1
                 WHEN 'pending' THEN 2
@@ -351,9 +363,9 @@ class TaskController extends Controller
                 ELSE 5
             END
         ")
-        ->orderBy('end_date', 'asc')
-        ->get();
-        
+            ->orderBy('end_date', 'asc')
+            ->get();
+
         if ($tasks->isEmpty()) {
             return response()->json([
                 'status' => false,
@@ -396,8 +408,4 @@ class TaskController extends Controller
             'tasks' => $response
         ]);
     }
-
-
-
-
 }
